@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>◈ Crypto Ticker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:       #07070f;
+  --surface:  #0e0e1c;
+  --surface2: #13132080;
+  --border:   rgba(0,207,255,.1);
+  --accent:   #00cfff;
+  --green:    #00e676;
+  --red:      #ff1744;
+  --text:     #d6daff;
+  --dim:      #555577;
+  --muted:    #7a7aaa;
+  --mono:     'JetBrains Mono',monospace;
+  --sans:     'Inter',system-ui,sans-serif;
+}
+
+html{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh}
+body{position:relative}
+
+body::before{
+  content:'';
+  position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(ellipse 60% 40% at 15% 50%,rgba(0,207,255,.04) 0%,transparent 70%),
+    radial-gradient(ellipse 50% 40% at 85% 20%,rgba(120,0,255,.04) 0%,transparent 70%);
+}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--dim);border-radius:2px}
+
+/* ── header ──────────────────────────────────────────────── */
+header{
+  position:sticky;top:0;z-index:100;
+  background:rgba(14,14,28,.85);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+  padding:0 24px;
+  height:54px;
+  display:flex;align-items:center;gap:28px;
+}
+
+.brand{
+  font-size:15px;font-weight:700;letter-spacing:.1em;
+  color:var(--accent);
+  text-shadow:0 0 24px rgba(0,207,255,.45);
+  white-space:nowrap;flex-shrink:0;
+}
+.brand b{color:var(--text);font-weight:700}
+
+.stats{display:flex;align-items:center;gap:0;flex:1;overflow:hidden}
+.stat{
+  display:flex;align-items:center;gap:6px;
+  padding:0 18px;
+  border-right:1px solid var(--border);
+  white-space:nowrap;
+}
+.stat:first-child{padding-left:0}
+.stat-label{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+.stat-val{font-family:var(--mono);font-size:12.5px;font-weight:500}
+.stat-chg{font-family:var(--mono);font-size:11px}
+
+.meta{display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:auto}
+#clock{font-family:var(--mono);font-size:13px;color:var(--muted)}
+#cntdwn{font-family:var(--mono);font-size:11px;color:var(--accent);opacity:.7;min-width:46px;text-align:right}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* ── error bar ────────────────────────────────────────────── */
+#err-bar{
+  display:none;
+  background:rgba(255,23,68,.08);
+  border-bottom:1px solid rgba(255,23,68,.25);
+  color:var(--red);
+  padding:7px 24px;
+  font-size:12px;
+}
+#err-bar.on{display:block}
+
+/* ── table ────────────────────────────────────────────────── */
+main{overflow-x:auto;position:relative;z-index:1}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+
+thead th{
+  padding:9px 14px;
+  font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--dim);
+  border-bottom:1px solid var(--border);
+  white-space:nowrap;
+  position:sticky;top:54px;background:var(--bg);z-index:50;
+  cursor:default;user-select:none;
+}
+th.r{text-align:right}
+
+tbody tr{border-bottom:1px solid rgba(255,255,255,.025);transition:background .12s}
+tbody tr:hover{background:rgba(0,207,255,.035)}
+
+td{padding:9px 14px;white-space:nowrap;vertical-align:middle}
+
+.td-rank{text-align:right;color:var(--dim);font-family:var(--mono);font-size:12px;width:48px}
+.td-coin{display:flex;align-items:center;gap:10px;min-width:190px}
+.coin-img{width:26px;height:26px;border-radius:50%;flex-shrink:0;object-fit:cover}
+.coin-name{font-weight:600;font-size:13.5px}
+.coin-sym{color:var(--dim);font-family:var(--mono);font-size:11px;letter-spacing:.03em;margin-top:1px}
+.td-price{text-align:right;font-family:var(--mono);font-weight:500;min-width:120px}
+.td-pct{text-align:right;font-family:var(--mono);font-size:12.5px;font-weight:500;width:100px}
+.td-cap,.td-vol{text-align:right;font-family:var(--mono);font-size:12.5px;color:var(--muted);min-width:110px}
+.td-chart{text-align:right;padding-right:24px;width:150px}
+
+.up{color:var(--green)}.down{color:var(--red)}.flat{color:var(--dim)}
+.big-up{color:var(--green);text-shadow:0 0 10px rgba(0,230,118,.5)}
+.big-down{color:var(--red);text-shadow:0 0 10px rgba(255,23,68,.5)}
+
+.spark{display:inline-block;width:130px;height:38px;vertical-align:middle}
+.spark svg{width:100%;height:100%}
+
+@keyframes flash-up  {0%,100%{background:transparent}25%{background:rgba(0,230,118,.12)}}
+@keyframes flash-down{0%,100%{background:transparent}25%{background:rgba(255,23,68,.12)}}
+tr.fl-up  {animation:flash-up   .7s ease}
+tr.fl-down{animation:flash-down .7s ease}
+
+/* skeleton */
+.sk{
+  display:inline-block;height:12px;border-radius:3px;
+  background:linear-gradient(90deg,var(--surface) 25%,rgba(255,255,255,.06) 50%,var(--surface) 75%);
+  background-size:200% 100%;
+  animation:shimmer 1.4s infinite;
+}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ── footer ───────────────────────────────────────────────── */
+footer{
+  padding:14px 24px;
+  border-top:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:11.5px;color:var(--dim);
+  position:relative;z-index:1;
+}
+footer a{color:var(--dim);text-decoration:none}
+footer a:hover{color:var(--accent)}
+#last-upd{font-family:var(--mono);font-size:11px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">◈ <b>CRYPTO TICKER</b></div>
+  <div class="stats" id="stats"></div>
+  <div class="meta">
+    <div class="dot"></div>
+    <span id="clock">--:--:--</span>
+    <span id="cntdwn">⟳ --s</span>
+  </div>
+</header>
+
+<div id="err-bar"></div>
+
+<main>
+  <table>
+    <thead>
+      <tr>
+        <th class="r">#</th>
+        <th>Coin</th>
+        <th class="r">Price</th>
+        <th class="r">24h</th>
+        <th class="r">7d</th>
+        <th class="r">Market Cap</th>
+        <th class="r">Vol (24h)</th>
+        <th class="r">7d Chart</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</main>
+
+<footer>
+  <span>Data: <a href="https://www.coingecko.com" target="_blank" rel="noopener">CoinGecko</a> · Top 20 by market cap · Updates every 30s</span>
+  <span id="last-upd">—</span>
+</footer>
+
+<script>
+const REFRESH = 30;
+const MARKETS = n =>
+  `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc` +
+  `&per_page=${n}&page=1&sparkline=true&price_change_percentage=24h%2C7d`;
+const GLOBAL  = `https://api.coingecko.com/api/v3/global`;
+
+let prevPrices = {};
+let lastFetch  = 0;
+let timer      = null;
+
+// ── format ────────────────────────────────────────────────────────────────────
+function fmtPrice(p) {
+  if (p == null) return '—';
+  if (p >= 10000) return '$' + p.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  if (p >= 1)     return '$' + p.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:4});
+  return '$' + p.toFixed(6);
+}
+
+function fmtLarge(n) {
+  if (!n) return '—';
+  if (n >= 1e12) return '$' + (n/1e12).toFixed(2) + 'T';
+  if (n >= 1e9)  return '$' + (n/1e9 ).toFixed(2) + 'B';
+  if (n >= 1e6)  return '$' + (n/1e6 ).toFixed(2) + 'M';
+  return '$' + Math.round(n).toLocaleString();
+}
+
+function pctInfo(v) {
+  if (v == null) return {text:'—', cls:'flat'};
+  const arrow = v > 0 ? '▲' : (v < 0 ? '▼' : '─');
+  const sign  = v > 0 ? '+' : '';
+  const cls   = Math.abs(v) > 5
+    ? (v > 0 ? 'big-up' : 'big-down')
+    : (v > 0 ? 'up' : (v < 0 ? 'down' : 'flat'));
+  return {text:`${arrow} ${sign}${v.toFixed(2)}%`, cls};
+}
+
+// ── sparkline ─────────────────────────────────────────────────────────────────
+function sparkSVG(prices, color, uid) {
+  if (!prices || prices.length < 2) return `<svg viewBox="0 0 130 38"></svg>`;
+  const step = Math.max(1, Math.floor(prices.length / 55));
+  const pts  = prices.filter((_,i) => i % step === 0).slice(-55);
+  const mn = Math.min(...pts), mx = Math.max(...pts);
+  const range = mx - mn || 1;
+  const W = 130, H = 38, PAD = 2;
+  const coords = pts.map((p,i) => ({
+    x: (i / (pts.length - 1)) * W,
+    y: PAD + (1 - (p - mn) / range) * (H - PAD * 2)
+  }));
+  const line  = coords.map(c => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
+  const area  = `0,${H} ${line} ${W},${H}`;
+  const gid   = `g${uid}`;
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${color}" stop-opacity=".22"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <polygon points="${area}" fill="url(#${gid})"/>
+    <polyline points="${line}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+// ── render global stats ───────────────────────────────────────────────────────
+function renderStats(g) {
+  const cap    = (g.total_market_cap?.usd  || 0);
+  const vol    = (g.total_volume?.usd      || 0);
+  const chg    = g.market_cap_change_percentage_24h_usd || 0;
+  const btc    = g.market_cap_percentage?.btc || 0;
+  const eth    = g.market_cap_percentage?.eth || 0;
+  const {text:ct, cls:cc} = pctInfo(chg);
+
+  document.getElementById('stats').innerHTML = [
+    `<div class="stat"><span class="stat-label">Market Cap</span><span class="stat-val">${fmtLarge(cap)}</span><span class="stat-chg ${cc}">${ct}</span></div>`,
+    `<div class="stat"><span class="stat-label">Vol 24h</span><span class="stat-val">${fmtLarge(vol)}</span></div>`,
+    `<div class="stat"><span class="stat-label">BTC Dom</span><span class="stat-val" style="color:#f7931a">${btc.toFixed(1)}%</span></div>`,
+    `<div class="stat"><span class="stat-label">ETH Dom</span><span class="stat-val" style="color:#627eea">${eth.toFixed(1)}%</span></div>`,
+  ].join('');
+}
+
+// ── render skeleton ───────────────────────────────────────────────────────────
+function renderSkeleton() {
+  const rows = Array.from({length:20}, (_,i) => `<tr>
+    <td class="td-rank">${i+1}</td>
+    <td><div class="td-coin"><div class="coin-img sk" style="width:26px;height:26px;border-radius:50%"></div>
+      <div><div class="sk" style="width:${70+Math.random()*50|0}px"></div></div></div></td>
+    <td class="td-price"><span class="sk" style="width:80px"></span></td>
+    <td class="td-pct"><span class="sk" style="width:60px"></span></td>
+    <td class="td-pct"><span class="sk" style="width:60px"></span></td>
+    <td class="td-cap"><span class="sk" style="width:70px"></span></td>
+    <td class="td-vol"><span class="sk" style="width:70px"></span></td>
+    <td class="td-chart"></td>
+  </tr>`).join('');
+  document.getElementById('tbody').innerHTML = rows;
+}
+
+// ── render coins ──────────────────────────────────────────────────────────────
+function renderCoins(coins) {
+  const tbody = document.getElementById('tbody');
+  const newPrices = {};
+
+  const rows = coins.map(c => {
+    const id    = c.id;
+    const price = c.current_price;
+    const chg24 = pctInfo(c.price_change_percentage_24h_in_currency);
+    const chg7  = pctInfo(c.price_change_percentage_7d_in_currency);
+    const v7    = c.price_change_percentage_7d_in_currency || 0;
+    const col   = v7 >= 0 ? 'var(--green)' : 'var(--red)';
+    const spark = (c.sparkline_in_7d?.price || []);
+    newPrices[id] = price;
+
+    let flashCls = '';
+    if (id in prevPrices) {
+      if (price > prevPrices[id]) flashCls = ' fl-up';
+      else if (price < prevPrices[id]) flashCls = ' fl-down';
+    }
+
+    return `<tr data-id="${id}" class="${flashCls}">
+      <td class="td-rank">${c.market_cap_rank || '—'}</td>
+      <td><div class="td-coin">
+        <img class="coin-img" src="${c.image}" alt="" loading="lazy" width="26" height="26">
+        <div><div class="coin-name">${c.name}</div><div class="coin-sym">${c.symbol.toUpperCase()}</div></div>
+      </div></td>
+      <td class="td-price">${fmtPrice(price)}</td>
+      <td class="td-pct"><span class="${chg24.cls}">${chg24.text}</span></td>
+      <td class="td-pct"><span class="${chg7.cls}">${chg7.text}</span></td>
+      <td class="td-cap">${fmtLarge(c.market_cap)}</td>
+      <td class="td-vol">${fmtLarge(c.total_volume)}</td>
+      <td class="td-chart"><div class="spark">${sparkSVG(spark, col, id)}</div></td>
+    </tr>`;
+  }).join('');
+
+  tbody.innerHTML = rows;
+  prevPrices = newPrices;
+}
+
+// ── fetch + refresh loop ──────────────────────────────────────────────────────
+async function fetchData() {
+  const errBar = document.getElementById('err-bar');
+  try {
+    const [mRes, gRes] = await Promise.all([
+      fetch(MARKETS(20)),
+      fetch(GLOBAL),
+    ]);
+    if (!mRes.ok) throw new Error(`HTTP ${mRes.status}`);
+    const [markets, global] = await Promise.all([mRes.json(), gRes.json()]);
+
+    renderCoins(markets);
+    renderStats(global.data || {});
+
+    const now = new Date();
+    document.getElementById('last-upd').textContent =
+      'Updated ' + now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+
+    errBar.classList.remove('on');
+    lastFetch = Date.now();
+  } catch (e) {
+    errBar.textContent = '⚠ ' + (e.message || 'Fetch failed — retrying…');
+    errBar.classList.add('on');
+    lastFetch = Date.now();
+  }
+}
+
+// ── clock + countdown tick ────────────────────────────────────────────────────
+function tick() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
+
+  const elapsed   = (Date.now() - lastFetch) / 1000;
+  const remaining = Math.max(0, REFRESH - Math.floor(elapsed));
+  document.getElementById('cntdwn').textContent = `⟳ ${remaining}s`;
+
+  if (elapsed >= REFRESH) fetchData();
+}
+
+// ── init ──────────────────────────────────────────────────────────────────────
+renderSkeleton();
+fetchData();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
