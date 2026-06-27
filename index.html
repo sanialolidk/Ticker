@@ -23,6 +23,9 @@
   --muted:    #7a7aaa;
   --mono:     'JetBrains Mono',monospace;
   --sans:     'Inter',system-ui,sans-serif;
+  --header-h: 55px;
+  --err-h:    0px;
+  --sticky-top: calc(var(--header-h) + var(--err-h));
 }
 
 html{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh}
@@ -43,11 +46,12 @@ body::before{
 /* ── header ──────────────────────────────────────────────── */
 header{
   position:sticky;top:0;z-index:100;
-  background:rgba(14,14,28,.85);
+  background:rgba(14,14,28,.92);
   backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
   border-bottom:1px solid var(--border);
   padding:0 24px;
-  height:54px;
+  height:var(--header-h);
+  box-sizing:border-box;
   display:flex;align-items:center;gap:28px;
 }
 
@@ -80,7 +84,8 @@ header{
 /* ── error bar ────────────────────────────────────────────── */
 #err-bar{
   display:none;
-  background:rgba(255,23,68,.08);
+  position:sticky;top:var(--header-h);z-index:90;
+  background:rgba(255,23,68,.12);
   border-bottom:1px solid rgba(255,23,68,.25);
   color:var(--red);
   padding:7px 24px;
@@ -91,7 +96,7 @@ header{
 /* ── table ────────────────────────────────────────────────── */
 main{overflow-x:auto;position:relative;z-index:1}
 
-table{width:100%;border-collapse:collapse;font-size:13px}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
 
 thead th{
   padding:9px 14px;
@@ -99,12 +104,19 @@ thead th{
   color:var(--dim);
   border-bottom:1px solid var(--border);
   white-space:nowrap;
-  position:sticky;top:54px;background:var(--bg);z-index:50;
+  position:sticky;top:var(--sticky-top);
+  background:var(--bg);
+  box-shadow:0 1px 0 var(--border);
+  z-index:50;
   cursor:default;user-select:none;
 }
 th.r{text-align:right}
 
-tbody tr{border-bottom:1px solid rgba(255,255,255,.025);transition:background .12s}
+tbody tr{
+  border-bottom:1px solid rgba(255,255,255,.025);
+  transition:background .12s;
+  scroll-margin-top:var(--sticky-top);
+}
 tbody tr:hover{background:rgba(0,207,255,.035)}
 
 td{padding:9px 14px;white-space:nowrap;vertical-align:middle}
@@ -200,6 +212,16 @@ const GLOBAL  = `https://api.coingecko.com/api/v3/global`;
 let prevPrices = {};
 let lastFetch  = Date.now();
 let fetching   = false;
+
+function syncStickyOffset() {
+  const header = document.querySelector('header');
+  const errBar = document.getElementById('err-bar');
+  document.documentElement.style.setProperty('--header-h', header.offsetHeight + 'px');
+  const h = errBar.classList.contains('on') ? errBar.offsetHeight : 0;
+  document.documentElement.style.setProperty('--err-h', h + 'px');
+}
+
+window.addEventListener('resize', syncStickyOffset);
 
 // ── format ────────────────────────────────────────────────────────────────────
 function fmtPrice(p) {
@@ -357,10 +379,12 @@ async function fetchData() {
 
     errBar.classList.remove('on');
     errBar.textContent = '';
+    syncStickyOffset();
     lastFetch = Date.now();
   } catch (e) {
     errBar.textContent = '⚠ ' + (e.message || 'Fetch failed — retrying…');
     errBar.classList.add('on');
+    syncStickyOffset();
     lastFetch = Date.now();
   } finally {
     fetching = false;
@@ -381,6 +405,7 @@ function tick() {
 }
 
 // ── init ──────────────────────────────────────────────────────────────────────
+syncStickyOffset();
 renderSkeleton();
 fetchData();
 setInterval(tick, 1000);
