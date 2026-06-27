@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>◈ Crypto Ticker</title>
+<!-- layout: split-table-v3 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -96,22 +97,22 @@ header{
 /* ── table ────────────────────────────────────────────────── */
 main{
   flex:1 1 auto;min-height:0;
-  overflow:auto;
+  display:flex;flex-direction:column;
+  overflow:hidden;
   position:relative;z-index:1;
 }
 
-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+.table-head{flex-shrink:0;overflow:hidden;border-bottom:1px solid var(--border)}
+.table-body{flex:1 1 auto;min-height:0;overflow:auto}
+
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;table-layout:fixed}
 
 thead th{
   padding:9px 14px;
   font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
   color:var(--dim);
-  border-bottom:1px solid var(--border);
-  white-space:nowrap;
-  position:sticky;top:0;
   background:var(--bg);
-  box-shadow:0 1px 0 var(--border);
-  z-index:2;
+  white-space:nowrap;
   cursor:default;user-select:none;
 }
 th.r{text-align:right}
@@ -121,7 +122,14 @@ tbody tr:hover{background:rgba(0,207,255,.035)}
 
 td{padding:9px 14px;white-space:nowrap;vertical-align:middle}
 
-.td-rank{text-align:right;color:var(--dim);font-family:var(--mono);font-size:12px;width:48px}
+.col-rank{width:48px}
+.col-coin{width:22%}
+.col-price{width:13%}
+.col-pct{width:9%}
+.col-cap{width:11%}
+.col-chart{width:150px}
+
+.td-rank{text-align:right;color:var(--dim);font-family:var(--mono);font-size:12px}
 .td-coin{display:flex;align-items:center;gap:10px;min-width:190px}
 .coin-img{width:26px;height:26px;border-radius:50%;flex-shrink:0;object-fit:cover}
 .coin-name{font-weight:600;font-size:13.5px}
@@ -181,21 +189,37 @@ footer a:hover{color:var(--accent)}
 <div id="err-bar"></div>
 
 <main>
-  <table>
-    <thead>
-      <tr>
-        <th class="r">#</th>
-        <th>Coin</th>
-        <th class="r">Price</th>
-        <th class="r">24h</th>
-        <th class="r">7d</th>
-        <th class="r">Market Cap</th>
-        <th class="r">Vol (24h)</th>
-        <th class="r">7d Chart</th>
-      </tr>
-    </thead>
-    <tbody id="tbody"></tbody>
-  </table>
+  <div class="table-head" id="table-head">
+    <table>
+      <colgroup>
+        <col class="col-rank"><col class="col-coin"><col class="col-price">
+        <col class="col-pct"><col class="col-pct"><col class="col-cap">
+        <col class="col-cap"><col class="col-chart">
+      </colgroup>
+      <thead>
+        <tr>
+          <th class="r">#</th>
+          <th>Coin</th>
+          <th class="r">Price</th>
+          <th class="r">24h</th>
+          <th class="r">7d</th>
+          <th class="r">Market Cap</th>
+          <th class="r">Vol (24h)</th>
+          <th class="r">7d Chart</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="table-body" id="table-body">
+    <table>
+      <colgroup>
+        <col class="col-rank"><col class="col-coin"><col class="col-price">
+        <col class="col-pct"><col class="col-pct"><col class="col-cap">
+        <col class="col-cap"><col class="col-chart">
+      </colgroup>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
 </main>
 
 <footer>
@@ -392,6 +416,11 @@ function tick() {
 
   if (elapsed >= REFRESH) fetchData();
 }
+
+// ── sync horizontal scroll between head + body tables ───────────────────────
+document.getElementById('table-body').addEventListener('scroll', e => {
+  document.getElementById('table-head').scrollLeft = e.target.scrollLeft;
+});
 
 // ── init ──────────────────────────────────────────────────────────────────────
 renderSkeleton();
