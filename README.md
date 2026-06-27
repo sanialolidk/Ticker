@@ -16,9 +16,15 @@ Refreshes every 30s. `ctrl+c` to exit.
 
 ## Web dashboard
 
-Open `index.html` locally, or use the GitHub Pages link above. Same data source, SVG sparklines, price flash on tick changes.
+Use the GitHub Pages link above — **do not open `index.html` as a local file** (`file://`), browsers block cross-origin API calls and you'll see "Failed to fetch".
 
-If the table stays on skeleton rows, CoinGecko may be rate-limiting — wait 30s or run the TUI instead (server-side fetch, more reliable).
+Refreshes every 60s. If the table stays on skeleton rows:
+
+- Wait for the next retry (automatic backoff)
+- Disable ad blockers / privacy extensions for the page
+- Add a free [CoinGecko Demo API key](https://www.coingecko.com/en/api/pricing): `?cg_key=YOUR_KEY`
+
+For the most reliable experience, run the TUI (`python main.py`) — server-side fetch avoids browser network limits.
 
 ## Stack
 

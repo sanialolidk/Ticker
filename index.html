@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>◈ Crypto Ticker</title>
-<!-- layout: split-table-v3 -->
+<!-- layout: split-table-v3 fetch-v2 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -223,20 +223,44 @@ footer a:hover{color:var(--accent)}
 </main>
 
 <footer>
-  <span>Data: <a href="https://www.coingecko.com" target="_blank" rel="noopener">CoinGecko</a> · Top 20 by market cap · Updates every 30s</span>
+  <span>Data: <a href="https://www.coingecko.com" target="_blank" rel="noopener">CoinGecko</a> · Top 20 by market cap · Updates every 60s</span>
   <span id="last-upd">—</span>
 </footer>
 
 <script>
-const REFRESH = 30;
-const MARKETS = n =>
+const REFRESH = 60;
+const MARKETS = (n, spark = true) =>
   `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc` +
-  `&per_page=${n}&page=1&sparkline=true&price_change_percentage=24h%2C7d`;
+  `&per_page=${n}&page=1&sparkline=${spark}&price_change_percentage=24h%2C7d`;
 const GLOBAL  = `https://api.coingecko.com/api/v3/global`;
+const FETCH_TIMEOUT_MS = 20000;
+const RETRY_DELAYS_MS  = [0, 1500, 4000];
 
 let prevPrices = {};
 let lastFetch  = Date.now();
 let fetching   = false;
+let hasData    = false;
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function apiHeaders() {
+  const headers = { Accept: 'application/json' };
+  const key = new URLSearchParams(location.search).get('cg_key');
+  if (key) headers['x-cg-demo-api-key'] = key;
+  return headers;
+}
+
+function explainFetchError(err) {
+  if (location.protocol === 'file:') {
+    return 'Cannot fetch from a local file — open https://sanialolidk.github.io/Ticker/';
+  }
+  if (err?.name === 'AbortError') return 'CoinGecko timed out — retrying…';
+  const msg = err?.message || '';
+  if (msg === 'Failed to fetch' || err?.name === 'TypeError') {
+    return 'Network blocked — check connection, VPN, or ad blocker, then retry';
+  }
+  return msg || 'Fetch failed — retrying…';
+}
 
 // ── format ────────────────────────────────────────────────────────────────────
 function fmtPrice(p) {
@@ -366,10 +390,39 @@ function renderCoins(coins) {
 
 // ── fetch + refresh loop ──────────────────────────────────────────────────────
 async function fetchJSON(url) {
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (res.status === 429) throw new Error('CoinGecko rate limit — retrying in 30s');
-  if (!res.ok) throw new Error(`HTTP ${res.status} from CoinGecko`);
-  return res.json();
+  let lastErr;
+  for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
+    if (RETRY_DELAYS_MS[attempt]) await sleep(RETRY_DELAYS_MS[attempt]);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, {
+        headers: apiHeaders(),
+        signal: ctrl.signal,
+        mode: 'cors',
+        cache: 'no-store',
+      });
+      if (res.status === 429) {
+        lastErr = new Error('CoinGecko rate limit — backing off');
+        continue;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status} from CoinGecko`);
+      return await res.json();
+    } catch (err) {
+      lastErr = err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw lastErr;
+}
+
+async function fetchMarkets() {
+  try {
+    return await fetchJSON(MARKETS(20, true));
+  } catch {
+    return fetchJSON(MARKETS(20, false));
+  }
 }
 
 async function fetchData() {
@@ -377,16 +430,23 @@ async function fetchData() {
   fetching = true;
   const errBar = document.getElementById('err-bar');
   try {
-    const [markets, global] = await Promise.all([
-      fetchJSON(MARKETS(20)),
-      fetchJSON(GLOBAL),
-    ]);
+    const markets = await fetchMarkets();
     if (!Array.isArray(markets) || !markets.length) {
       throw new Error('Empty market response — API may be throttled');
     }
 
+    let globalData = {};
+    try {
+      await sleep(400);
+      const global = await fetchJSON(GLOBAL);
+      globalData = global.data || {};
+    } catch {
+      /* stats bar is optional when global endpoint fails */
+    }
+
     renderCoins(markets);
-    renderStats(global.data || {});
+    renderStats(globalData);
+    hasData = true;
 
     const now = new Date();
     document.getElementById('last-upd').textContent =
@@ -396,8 +456,9 @@ async function fetchData() {
     errBar.textContent = '';
     lastFetch = Date.now();
   } catch (e) {
-    errBar.textContent = '⚠ ' + (e.message || 'Fetch failed — retrying…');
+    errBar.textContent = '⚠ ' + explainFetchError(e);
     errBar.classList.add('on');
+    if (!hasData) renderSkeleton();
     lastFetch = Date.now();
   } finally {
     fetching = false;
