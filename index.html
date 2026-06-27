@@ -198,8 +198,8 @@ const MARKETS = n =>
 const GLOBAL  = `https://api.coingecko.com/api/v3/global`;
 
 let prevPrices = {};
-let lastFetch  = 0;
-let timer      = null;
+let lastFetch  = Date.now();
+let fetching   = false;
 
 // ── format ────────────────────────────────────────────────────────────────────
 function fmtPrice(p) {
@@ -328,15 +328,25 @@ function renderCoins(coins) {
 }
 
 // ── fetch + refresh loop ──────────────────────────────────────────────────────
+async function fetchJSON(url) {
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (res.status === 429) throw new Error('CoinGecko rate limit — retrying in 30s');
+  if (!res.ok) throw new Error(`HTTP ${res.status} from CoinGecko`);
+  return res.json();
+}
+
 async function fetchData() {
+  if (fetching) return;
+  fetching = true;
   const errBar = document.getElementById('err-bar');
   try {
-    const [mRes, gRes] = await Promise.all([
-      fetch(MARKETS(20)),
-      fetch(GLOBAL),
+    const [markets, global] = await Promise.all([
+      fetchJSON(MARKETS(20)),
+      fetchJSON(GLOBAL),
     ]);
-    if (!mRes.ok) throw new Error(`HTTP ${mRes.status}`);
-    const [markets, global] = await Promise.all([mRes.json(), gRes.json()]);
+    if (!Array.isArray(markets) || !markets.length) {
+      throw new Error('Empty market response — API may be throttled');
+    }
 
     renderCoins(markets);
     renderStats(global.data || {});
@@ -346,11 +356,14 @@ async function fetchData() {
       'Updated ' + now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
 
     errBar.classList.remove('on');
+    errBar.textContent = '';
     lastFetch = Date.now();
   } catch (e) {
     errBar.textContent = '⚠ ' + (e.message || 'Fetch failed — retrying…');
     errBar.classList.add('on');
     lastFetch = Date.now();
+  } finally {
+    fetching = false;
   }
 }
 
